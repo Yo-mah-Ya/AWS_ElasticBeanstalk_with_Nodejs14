@@ -1,0 +1,445 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  # Project Name Parameter
+  ProjectPrefix:
+    Type: String
+    Default: ""
+
+  # Elastic Beanstalk
+  bucket:
+    Type: String
+  bucketKey:
+    Type: String
+  ec2KeyName:
+    Type: String
+
+  # NetWork Configration Parameter
+  VPCCIDR:
+    Type: String
+    Default: "192.168.0.0/16"
+  PublicSubnetACIDR:
+    Type: String
+    Default: "192.168.0.0/24"
+  PublicSubnetCCIDR:
+    Type: String
+    Default: "192.168.64.0/24"
+  PrivateSubnetACIDR:
+    Type: String
+    Default: "192.168.128.0/24"
+  PrivateSubnetCCIDR:
+    Type: String
+    Default: "192.168.192.0/24"
+
+Resources:
+  # ------------------------------------------------------------#
+  #  VPC
+  # ------------------------------------------------------------#
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}vpc"
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}igw"
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # ------------------------------------------------------------#
+  #  Subnet
+  # ------------------------------------------------------------#
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PublicSubnetACIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}public-subnet-a"
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PublicSubnetCCIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}public-subnet-c"
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PrivateSubnetACIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}private-subnet-a"
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PrivateSubnetCCIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}private-subnet-c"
+
+  # ------------------------------------------------------------#
+  #  RouteTable
+  # ------------------------------------------------------------#
+  PublicRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}public-route-a"
+  PublicRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}public-route-c"
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}private-route-a"
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectPrefix}private-route-c"
+
+  # ------------------------------------------------------------#
+  # Routing
+  # ------------------------------------------------------------#
+  PublicRouteA:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTableA
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+  PublicRouteC:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTableC
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  # ------------------------------------------------------------#
+  # RouteTable Associate
+  # ------------------------------------------------------------#
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTableA
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTableC
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTableA
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  # ------------------------------------------------------------#
+  # ALB
+  # ------------------------------------------------------------#
+  # Listener:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     DefaultActions:
+  #       - TargetGroupArn: !Ref TargetGroup
+  #         Type: forward
+  #     LoadBalancerArn: !Ref ALB
+  #     Port: 80
+  #     Protocol: HTTP
+  # # ALB
+  # ALB:
+  #   Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  #   Properties:
+  #     IpAddressType: ipv4
+  #     Name: !Sub ${ProjectPrefix}LoadBalancer
+  #     Scheme: internet-facing
+  #     SecurityGroups:
+  #       - !Ref ElasticBeanstalkAlbSecurityGroup
+  #     Subnets:
+  #       - !Ref PublicSubnetA
+  #       - !Ref PublicSubnetC
+  #     Type: application
+  # # TargetGroup
+  # TargetGroup:
+  #   Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  #   Properties:
+  #     HealthCheckEnabled: true
+  #     HealthCheckIntervalSeconds: 60
+  #     HealthCheckPath: /health
+  #     HealthCheckPort: traffic-port
+  #     HealthCheckProtocol: HTTP
+  #     HealthCheckTimeoutSeconds: 30
+  #     HealthyThresholdCount: 5
+  #     Matcher:
+  #       HttpCode: 200-301
+  #     Name: !Sub ${ProjectPrefix}TargetGroup
+  #     Port: 80
+  #     Protocol: HTTP
+  #     # TargetType: instance
+  #     UnhealthyThresholdCount: 3
+  #     VpcId: !Ref VPC
+
+  # ------------------------------------------------------------#
+  # Elastic Beanstalk
+  # ------------------------------------------------------------#
+  ElasticBeanstalkAlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectPrefix}ElasticBeanstalkAlbSecurityGroup
+      GroupDescription: "Security-Group for Elastic Beanstalk ALB"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: "0.0.0.0/0"
+          Description: This is for ALB
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}ElasticBeanstalkAlbSecurityGroup
+
+  ElasticBeanstalkAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ElasticBeanstalkAppSecurityGroup
+      GroupDescription: "Security-Group for Elastic Beanstalk App"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: "0.0.0.0/0"
+          FromPort: 3000
+          IpProtocol: tcp
+          # SourceSecurityGroupId: !Ref ElasticBeanstalkAlbSecurityGroup
+          ToPort: 3000
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}ElasticBeanstalkAppSecurityGroup
+
+  # ------------------------------------------------------------#
+  # Elastic Beanstalk
+  # ------------------------------------------------------------#
+  ElasticBeanstalkApplication:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Sub ${ProjectPrefix}test-app
+      Description: AWS Elastic Beanstalk Sample Application
+  ElasticBeanstalkApplicationVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName: !Ref ElasticBeanstalkApplication
+      Description: AWS ElasticBeanstalk Sample Application Version
+      SourceBundle:
+        S3Bucket: !Sub ${bucket}
+        S3Key: !Sub ${bucketKey}
+  ElasticBeanstalkConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName: !Ref ElasticBeanstalkApplication
+      Description: AWS ElasticBeanstalk Sample Configuration Template
+      OptionSettings:
+        - Namespace: aws:ec2:vpc
+          OptionName: VPCId
+          Value: !Ref VPC
+        # The IDs of the Auto Scaling group subnet or subnets.
+        - Namespace: aws:ec2:vpc
+          OptionName: Subnets
+          # Value: !Sub ${PrivateSubnetA},${PrivateSubnetC}
+          Value: !Sub ${PublicSubnetA},${PublicSubnetC}
+        # The IDs of the subnet or subnets for the elastic load balancer.
+        - Namespace: aws:ec2:vpc
+          OptionName: ELBSubnets
+          Value: !Sub ${PublicSubnetA},${PublicSubnetC}
+        # public or internal
+        - Namespace: aws:ec2:vpc
+          OptionName: ELBScheme
+          Value: public
+        # Specifies whether to launch instances with public IP addresses in your Amazon VPC.
+        - Namespace: aws:ec2:vpc
+          OptionName: AssociatePublicIpAddress
+          Value: true # false
+        - Namespace: aws:elasticbeanstalk:application
+          OptionName: Application Healthcheck URL
+          Value: /health
+        - Namespace: aws:autoscaling:asg
+          OptionName: MinSize
+          Value: 1
+        - Namespace: aws:autoscaling:asg
+          OptionName: MaxSize
+          Value: 2
+        # Set to SingleInstance to launch one EC2 instance with no load balancer.
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: SingleInstance # LoadBalanced
+        # The name or ARN of an IAM role that Elastic Beanstalk uses to manage resources for the environment.
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: ServiceRole
+          Value: !Ref ElasticBeanstalkServiceRole
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: LoadBalancerType
+          Value: application
+        # When false, the environment has its own dedicated load balancer, created, and managed by Elastic Beanstalk.
+        # When true, the environment uses a shared load balancer, created by you and specified in the SharedLoadBalancer option of the aws:elbv2:loadbalancer namespace.
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: LoadBalancerIsShared
+          Value: false
+        # ------------------------------------------------------------#
+        # CloudWatchLogs
+        # ------------------------------------------------------------#
+        - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+          OptionName: StreamLogs
+          Value: true
+        - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+          OptionName: DeleteOnTerminate
+          Value: true
+        - Namespace: aws:elasticbeanstalk:cloudwatch:logs
+          OptionName: RetentionInDays
+          Value: 180
+        #       # ------------------------------------------------------------#
+        #       # ALB
+        #       # ------------------------------------------------------------#
+        #       # - Namespace: aws:elbv2:loadbalancer
+        #       #   OptionName: IdleTimeout
+        #       #   Value:
+        #       # - Namespace: aws:elbv2:loadbalancer
+        #       #   OptionName: ManagedSecurityGroup
+        #       #   Value: !Ref ElasticBeanstalkAlbSecurityGroup
+
+        #       # listener
+        #       # - Namespace: aws:elbv2:listener:listener_port
+        #       #   OptionName: ListenerEnabled
+        #       #   Value: true
+        #       # - Namespace: aws:elbv2:listener:listener_port
+        #       #   OptionName: Protocol
+        #       #   Value: HTTP
+        #       # - Namespace: aws:elbv2:listener:listener_port
+        #       #   OptionName: SecurityGroups
+        #       #   Value: !Ref ElasticBeanstalkAlbSecurityGroup
+        #       # - Namespace: aws:elbv2:listener:listener_port
+        #       #   OptionName: SecurityGroups
+        #       #   Value: !Ref ElasticBeanstalkAlbSecurityGroup
+        #       # - Namespace: aws:elbv2:listener:listener_port
+        #       #   OptionName: SecurityGroups
+        #       #   Value: !Ref ElasticBeanstalkAlbSecurityGroup
+        #       # - Namespace: aws:elbv2:loadbalancer
+        #       #   OptionName: SharedLoadBalancer
+        #       #   Value: !Ref ALB
+
+        # ------------------------------------------------------------#
+        # Launch Configuration
+        # ------------------------------------------------------------#
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: EC2KeyName
+          Value: !Sub ${ec2KeyName}
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: InstanceType
+          Value: t2.micro
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: SecurityGroups
+          Value: !Sub ${ElasticBeanstalkAppSecurityGroup}
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: !Ref ElasticBeanstalkInstanceProfile
+      # SolutionStackName: 64bit Amazon Linux 2 v3.4.11 running Docker
+      SolutionStackName: 64bit Amazon Linux 2 v5.4.10 running Node.js 14
+  ElasticBeanstalkEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      ApplicationName: !Ref ElasticBeanstalkApplication
+      Description: AWS ElasticBeanstalk Sample Environment
+      EnvironmentName: prod
+      TemplateName: !Ref ElasticBeanstalkConfigurationTemplate
+      VersionLabel: !Ref ElasticBeanstalkApplicationVersion
+
+  # ------------------------------------------------------------#
+  # IAM
+  # ------------------------------------------------------------#
+  ElasticBeanstalkInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: Beanstalk EC2 role
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+        # - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier
+      Path: /
+      RoleName: aws-elasticbeanstalk-ec2-role
+  ElasticBeanstalkInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ElasticBeanstalkInstanceRole
+  ElasticBeanstalkServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - elasticbeanstalk.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: "elasticbeanstalk"
+      Description: Beanstalk Service role
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkEnhancedHealth
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdatesCustomerRolePolicy
+      Path: /
+      RoleName: aws-elasticbeanstalk-service-role

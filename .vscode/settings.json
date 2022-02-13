@@ -1,0 +1,45 @@
+{
+  "editor.formatOnSave": true,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/node_modules/": true,
+    "**/npm-packages-offline-cache": true,
+    "**/build/": true
+  },
+  "eslint.packageManager": "yarn",
+  "eslint.validate": ["javascript", "typescript"],
+  "eslint.lintTask.enable": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "npm.packageManager": "yarn",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "cSpell.enabled": true,
+  "cSpell.words": [
+    "appenders",
+    "openapi",
+    "postgres",
+    "postgresql",
+    "varchar",
+    "tinyint",
+    "kohler",
+    "dbaeumer",
+    "editorconfig",
+    "esbenp",
+    "firsttris",
+    "shardulm",
+    "smallint",
+    "upsert",
+    "Unprocessable",
+    "deepmerge",
+    "tsbuildinfo",
+    "codegen"
+  ],
+  "[sql]": {
+    "editor.defaultFormatter": "mtxr.sqltools"
+  }
+}
